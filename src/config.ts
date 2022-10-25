@@ -1,14 +1,10 @@
 export const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com/v1";
 export const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
-export const CREATOR_ADDRESS="0x9f938f0806578c25da55e57f6a3eed07b3b4214ad2d6816bfada81dca1bebe6f"
-export const CREATOR_PUBLIC_KEY="0x5521c24cb3a4c84d4d81b0e18f8b352cb1019cae09b6d9dad4e3fac0c862a56f"
-export const CREATOR_PRIVATE_KEY="0xbe401420f0704665e77dc6600af681d9ccb219209b56bfd8275068efbaaa3568"
+export const APTOS_COIN_DECIMAL=100_000_000
+export const CREATOR_ADDRESS=process.env.CREATOR_ADDRESS || ""
+export const CREATOR_PUBLIC_KEY=process.env.CREATOR_PUBLIC_KEY || ""
+export const CREATOR_PRIVATE_KEY=process.env.CREATOR_PRIVATE_KEY || ""
 
-export const MINTER_ADDRESS="0x8e6c826f27daf269e8294df86ec6a9d930a4cd672d6173080fc2d4fa9c0fdd02"
-export const MINTER_PUBLIC_KEY="0xd7fef9854de57ebe8083f202839ff5d606c9b356548e6e39532daf11c593db10"
-export const MINTER_PRIVATE_KEY="0x9239bfe38d02d9c520b06a3cd6e84ea922b991f59bad63bce16622c29dad37a4"
-
-//
-// export const CREATOR_ADDRESS="0xe5eee1ce7f620f675e7b77aadc0e533a2675b4a319274262f353ee976208cc37"
-// export const CREATOR_PUBLIC_KEY="0xa74c8dad6698dfbc2b44758d114e58d72b5ff460f352c0020359e8a2c1948837"
-// export const CREATOR_PRIVATE_KEY="0x526ea14435c1259969ec2d0855d24dcf0eaeb2cce4c3d7ea704df60e43042ddb"
+export const MINTER_ADDRESS=process.env.MINTER_ADDRESS || ""
+export const MINTER_PUBLIC_KEY=process.env.MINTER_PUBLIC_KEY || ""
+export const MINTER_PRIVATE_KEY=process.env.MINTER_PRIVATE_KEY || ""

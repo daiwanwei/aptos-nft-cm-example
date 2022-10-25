@@ -5,10 +5,10 @@ import {createCandyMachine, createCollection, mintTokens, uploadNFT} from "./can
 
 async function main() {
     console.log(`hello`)
-    const account=loadCreatorAccount()
-    // const account=new AptosAccount()
-    // console.log(account.toPrivateKeyObject())
-    // await fundAccount(account.address().hex(),100_000_000)
+    // const account=loadCreatorAccount()
+    const account=new AptosAccount()
+    console.log(account.toPrivateKeyObject())
+    await fundAccount(account.address().hex(),100_000_000)
     const aptosClient=new AptosClient(NODE_URL)
 
     /*step 1:
@@ -21,7 +21,7 @@ async function main() {
     * createCandyMachine
     * */
     // const createCollectionReq={
-    //     name:"Daiwanwei-2",
+    //     name:"Daiwanwei-3",
     //     description:"daiwanwei first token!",
     //     uri:"https://github.com/daiwanwei",
     //     maxSupply:10n,
@@ -31,7 +31,7 @@ async function main() {
     // }
     // const res2=await createCollection(aptosClient,account,createCollectionReq)
 
-    //
+
     // let tokenNames=[]
     // let uris=[]
     // let descriptions=[]
@@ -62,12 +62,12 @@ async function main() {
     //     propertyValues.push(vTmp)
     //     propertyTypes.push(tTmp)
     // }
-    // console.log(tokenNames.length)
-    // console.log(uris.length)
-    // console.log(propertyValues.length)
+    // // console.log(tokenNames.length)
+    // // console.log(uris.length)
+    // // console.log(propertyValues.length)
     // const uploadNFTReq={
     //     creator: TxnBuilderTypes.AccountAddress.fromHex(account.address()),
-    //     collectionName:"Daiwanwei",
+    //     collectionName:"Daiwanwei-3",
     //     tokenNames,
     //     descriptions,
     //     uris,
@@ -77,21 +77,29 @@ async function main() {
     // }
     //
     // const res3=await uploadNFT(aptosClient,account,uploadNFTReq)
-
+    // const receipt =await aptosClient.waitForTransactionWithResult(res3)
+    // //@ts-ignore
+    // const isSuccess=receipt.success
+    // if (isSuccess){
+    //     console.log(`txn success,${res3}`)
+    // }else {
+    //     //@ts-ignore
+    //     console.log(`txn fail,${receipt.vm_status}`)
+    // }
     /*step 4:
     * createCandyMachine
     * */
-    const minterAccount=loadMinterAccount()
+    // const minterAccount=loadMinterAccount()
     // await fundAccount(minterAccount.address().hex(),1_000_000_000_000)
     // console.log(minterAccount.address())
     // const creator=new HexString("0x30957ce23fa2e31cb10766e27e950cf8aa2245e3273f2e18b2ef84ad4870cd9e")
-    const mintTokensReq={
-        // creator: TxnBuilderTypes.AccountAddress.fromHex(creator),
-        creator: TxnBuilderTypes.AccountAddress.fromHex(account.address()),
-        collectionName:"Daiwanwei-2",
-        amount:1n,
-    }
-    const res4=await mintTokens(aptosClient,minterAccount,mintTokensReq)
+    // const mintTokensReq={
+    //     // creator: TxnBuilderTypes.AccountAddress.fromHex(creator),
+    //     creator: TxnBuilderTypes.AccountAddress.fromHex(account.address()),
+    //     collectionName:"Daiwanwei-3",
+    //     amount:1n,
+    // }
+    // const res4=await mintTokens(aptosClient,minterAccount,mintTokensReq)
 }
 
 main()
