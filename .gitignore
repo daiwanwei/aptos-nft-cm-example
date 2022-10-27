@@ -1,1 +1,5 @@
 /pnpm-lock.yaml
+/.env.mainnet
+/.env
+/.env.devnet
+/whitelist.csv

@@ -1,11 +1,11 @@
 import type {Arguments, CommandBuilder} from 'yargs';
 import {createCandyMachine, createCollection, mintTokens, updateWhitelist} from "../../candyMachine";
-import {loadCreatorAccount, loadMinterAccount} from "../../helpers";
+import {loadCreatorAccount, loadMinterAccount, readWhitelist, retryFn} from "../../helpers";
 import {AptosClient, TxnBuilderTypes} from "aptos";
 import {NODE_URL} from "../../config";
 import fs from "fs";
 import {logger} from "../../logger";
-
+import * as csv from "fast-csv"
 type Options = {
     collectionName:string,
     whitelist:string
@@ -27,7 +27,7 @@ export const builder: CommandBuilder<Options, Options> = (yargs) =>
             type: 'string',
             demandOption: true,
             describe: 'whitelist path',
-            default:"/Users/daiwanwei/Projects/aptos_ex/aptos-nft-cm-example/whitelist.json"
+            default:"/Users/daiwanwei/Projects/aptos_ex/aptos-nft-cm-example/whitelist.csv"
         })
 
 interface Info{
@@ -40,25 +40,77 @@ export async function handler(argv: Arguments<Options>): Promise<void> {
         whitelist,
         collectionName
     }=argv
-
-    const info= JSON.parse(fs.readFileSync(whitelist).toString()) as Info[]
-    let addresses:TxnBuilderTypes.AccountAddress[]=[]
-    let amounts:bigint[]=[]
-    info.forEach(({address,mintAmount})=>{
-        addresses.push(TxnBuilderTypes.AccountAddress.fromHex(address))
-        amounts.push(BigInt(mintAmount))
-    })
+    const wl=await readWhitelist(whitelist)
     const aptosClient=new AptosClient(NODE_URL)
     const minterAccount=loadCreatorAccount()
-    const res=await updateWhitelist(aptosClient,minterAccount,collectionName,addresses,amounts)
-    const receipt = await aptosClient.waitForTransactionWithResult(res)
-    //@ts-ignore
-    const isSuccess=receipt.success
-    if (isSuccess){
-        logger.info(`updateWhitelist txn success,(${res})`)
-    }else {
-        //@ts-ignore
-        logger.error(`updateWhitelist txn fail,(${receipt.vm_status})`)
+    const total=wl.length
+    const batch=15
+    const step=Math.floor(total/batch)
+    for(let i=0;i<step;i++){
+        logger.info(`updateWL step(${i},${step})`)
+        const fn=async ()=>{
+            const tmp=wl.slice(i*batch,(i+1)*batch)
+            try {
+                let addresses:TxnBuilderTypes.AccountAddress[]=[]
+                let amounts:bigint[]=[]
+                tmp.forEach(({address,mintAmount})=>{
+                    addresses.push(TxnBuilderTypes.AccountAddress.fromHex(address))
+                    amounts.push(BigInt(mintAmount))
+                })
+                const res=await updateWhitelist(aptosClient,minterAccount,collectionName,addresses,amounts)
+                const receipt = await aptosClient.waitForTransactionWithResult(res)
+                //@ts-ignore
+                const isSuccess=receipt.success
+                if (isSuccess){
+                    logger.info(`updateWhitelist txn success,(${res})`)
+                    //@ts-ignore
+                    logger.info(`updateWhitelist gas used, gas(${receipt.gas_used}),price(${receipt.gas_unit_price})`)
+                    return true
+                }else {
+                    logger.error(`updateWhitelist txn fail,filenames (${JSON.stringify(tmp)})`)
+                    //@ts-ignore
+                    logger.error(`updateWhitelist txn fail,(${receipt.vm_status})`)
+                    return false
+                }
+            }catch (e){
+                logger.error(`updateWhitelist txn fail,filenames (${JSON.stringify(tmp)})`)
+                logger.error(`updateWhitelist NFT fail: err(${e})`)
+                return false
+            }
+        }
+        await retryFn(5,fn)
     }
-    process.exit(0);
+    logger.info(`updateWL reminder(`)
+    const fn=async ()=>{
+        const tmp=wl.slice(step*batch,total)
+        try {
+            let addresses:TxnBuilderTypes.AccountAddress[]=[]
+            let amounts:bigint[]=[]
+            tmp.forEach(({address,mintAmount})=>{
+                addresses.push(TxnBuilderTypes.AccountAddress.fromHex(address))
+                amounts.push(BigInt(mintAmount))
+            })
+            const res=await updateWhitelist(aptosClient,minterAccount,collectionName,addresses,amounts)
+            const receipt = await aptosClient.waitForTransactionWithResult(res)
+            //@ts-ignore
+            const isSuccess=receipt.success
+            if (isSuccess){
+                logger.info(`updateWhitelist txn success,(${res})`)
+                //@ts-ignore
+                logger.info(`updateWhitelist gas used, gas(${receipt.gas_used}),price(${receipt.gas_unit_price})`)
+                return true
+            }else {
+                logger.error(`updateWhitelist txn fail,filenames (${JSON.stringify(tmp)})`)
+                //@ts-ignore
+                logger.error(`updateWhitelist txn fail,(${receipt.vm_status})`)
+                return false
+            }
+        }catch (e){
+            logger.error(`updateWhitelist txn fail,filenames (${JSON.stringify(tmp)})`)
+            logger.error(`updateWhitelist NFT fail: err(${e})`)
+            return false
+        }
+    }
+    await retryFn(5,fn)
+
 };

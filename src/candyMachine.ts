@@ -2,8 +2,9 @@ import {AptosAccount, AptosClient, BCS, TxnBuilderTypes} from "aptos";
 
 import {logger} from "./logger";
 
-const CANDY_MACHINE_MODULE_ADDRESS=`0xdf5c814388f4162f353e14f6123fcba8f39a958e4a2640e38e9e2c7cdfd2ac1d::candy_machine_v2`
-
+const CANDY_MACHINE_MODULE_ADDRESS=`0x4b8cec33043700c2e159b55d39dff908c28f21ebaf0d64b0539a465721021a3a::candy_machine_v2`
+// const CANDY_MACHINE_MODULE_ADDRESS=`0x5ac985f1fe40c5121eb33699952ce8a79b1d1cb7438709dbd1da8e840a04fbee::candy_machine_v2`
+// const CANDY_MACHINE_MODULE_ADDRESS=`0xdf5c814388f4162f353e14f6123fcba8f39a958e4a2640e38e9e2c7cdfd2ac1d::candy_machine_v2`
 export async function createCandyMachine(
     client:AptosClient,account:AptosAccount
 ) {
@@ -23,7 +24,7 @@ export async function createCandyMachine(
         TxnBuilderTypes.AccountAddress.fromHex(account.address()),
         BigInt(sequenceNumber),
         payload,
-        100000n,
+        1000000n,
         100n,
         expireAt,
         new TxnBuilderTypes.ChainId(chainId),
@@ -82,7 +83,7 @@ export async function createCollection(
         TxnBuilderTypes.AccountAddress.fromHex(account.address()),
         BigInt(sequenceNumber),
         payload,
-        100000n,
+        1000000n,
         100n,
         expireAt,
         new TxnBuilderTypes.ChainId(chainId),
@@ -100,6 +101,8 @@ export interface UploadNFTReq{
     descriptions:string[]
     uris:string[]
     creator:TxnBuilderTypes.AccountAddress
+    royaltyNumerator:number
+    royaltyDenominator:number
     propertyKeys:string[][]
     propertyValues:number[][][]
     propertyTypes:string[][]
@@ -111,9 +114,9 @@ export async function uploadNFT(
 ) {
     const {
         collectionName, tokenNames,descriptions,creator,
+        royaltyNumerator,royaltyDenominator,
         uris,propertyKeys,propertyValues,propertyTypes
     }=req
-    // const creator=TxnBuilderTypes.AccountAddress.fromHex(account.address().hex())
     const keys=BCS.serializeVectorWithFunc(
         propertyKeys.map(key=>{
             return  BCS.serializeVectorWithFunc(key,"serializeStr")
@@ -140,8 +143,8 @@ export async function uploadNFT(
                 BCS.serializeVectorWithFunc(descriptions,"serializeStr"),
                 BCS.serializeVectorWithFunc(uris,"serializeStr"),
                 BCS.bcsToBytes(creator),
-                BCS.bcsSerializeUint64(1000),
-                BCS.bcsSerializeUint64(1),
+                BCS.bcsSerializeUint64(royaltyDenominator),
+                BCS.bcsSerializeUint64(royaltyNumerator),
                 BCS.serializeVectorWithFunc([true,true,true,true,true],"serializeBool"),
                 keys,
                 values,
@@ -158,7 +161,7 @@ export async function uploadNFT(
         TxnBuilderTypes.AccountAddress.fromHex(account.address()),
         BigInt(sequenceNumber),
         payload,
-        100000n,
+        1000000n,
         100n,
         expireAt,
         new TxnBuilderTypes.ChainId(chainId),
@@ -202,7 +205,7 @@ export async function mintTokens(
         TxnBuilderTypes.AccountAddress.fromHex(account.address()),
         BigInt(sequenceNumber),
         payload,
-        100000n,
+        1000000n,
         100n,
         expireAt,
         new TxnBuilderTypes.ChainId(chainId),
@@ -214,12 +217,45 @@ export async function mintTokens(
     return pendingTx.hash
 }
 
+export async function updatePublic(
+    client:AptosClient,account:AptosAccount,
+    collectionName:string,isPublic:boolean
+) {
+    const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+        TxnBuilderTypes.EntryFunction.natural(
+            CANDY_MACHINE_MODULE_ADDRESS,
+            "set_is_public",
+            [], [
+                BCS.bcsSerializeStr(collectionName),
+                BCS.bcsSerializeBool(isPublic),
+            ]
+        )
+    )
+    const [{sequence_number: sequenceNumber}, chainId] = await Promise.all([
+        client.getAccount(account.address()),
+        client.getChainId()
+    ])
+    const expireAt = BigInt(Math.floor(Date.now() / 1000) + 10)
+    const tx = new TxnBuilderTypes.RawTransaction(
+        TxnBuilderTypes.AccountAddress.fromHex(account.address()),
+        BigInt(sequenceNumber),
+        payload,
+        1000000n,
+        100n,
+        expireAt,
+        new TxnBuilderTypes.ChainId(chainId),
+    )
+
+    const bcsTx = AptosClient.generateBCSTransaction(account, tx);
+    const pendingTx = await client.submitSignedBCSTransaction(bcsTx);
+    logger.info(`updatePublic submit tx(${pendingTx.hash})`)
+    return pendingTx.hash
+}
+
 export async function updateMintFee(
     client:AptosClient,account:AptosAccount,
     collectionName:string,mintFee:bigint
 ) {
-    console.log(collectionName)
-    console.log(mintFee)
     const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
         TxnBuilderTypes.EntryFunction.natural(
             CANDY_MACHINE_MODULE_ADDRESS,
@@ -239,7 +275,7 @@ export async function updateMintFee(
         TxnBuilderTypes.AccountAddress.fromHex(account.address()),
         BigInt(sequenceNumber),
         payload,
-        100000n,
+        1000000n,
         100n,
         expireAt,
         new TxnBuilderTypes.ChainId(chainId),
@@ -248,6 +284,76 @@ export async function updateMintFee(
     const bcsTx = AptosClient.generateBCSTransaction(account, tx);
     const pendingTx = await client.submitSignedBCSTransaction(bcsTx);
     logger.info(`updateMintFee submit tx(${pendingTx.hash})`)
+    return pendingTx.hash
+}
+
+export async function updatePreMintTime(
+    client:AptosClient,account:AptosAccount,
+    collectionName:string,time:number
+) {
+    const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+        TxnBuilderTypes.EntryFunction.natural(
+            CANDY_MACHINE_MODULE_ADDRESS,
+            "set_presale_mint_time",
+            [], [
+                BCS.bcsSerializeStr(collectionName),
+                BCS.bcsSerializeUint64(time),
+            ]
+        )
+    )
+    const [{sequence_number: sequenceNumber}, chainId] = await Promise.all([
+        client.getAccount(account.address()),
+        client.getChainId()
+    ])
+    const expireAt = BigInt(Math.floor(Date.now() / 1000) + 10)
+    const tx = new TxnBuilderTypes.RawTransaction(
+        TxnBuilderTypes.AccountAddress.fromHex(account.address()),
+        BigInt(sequenceNumber),
+        payload,
+        1000000n,
+        100n,
+        expireAt,
+        new TxnBuilderTypes.ChainId(chainId),
+    )
+
+    const bcsTx = AptosClient.generateBCSTransaction(account, tx);
+    const pendingTx = await client.submitSignedBCSTransaction(bcsTx);
+    logger.info(`updatePreMintTime submit tx(${pendingTx.hash})`)
+    return pendingTx.hash
+}
+
+export async function updateMintTime(
+    client:AptosClient,account:AptosAccount,
+    collectionName:string,time:number
+) {
+    const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+        TxnBuilderTypes.EntryFunction.natural(
+            CANDY_MACHINE_MODULE_ADDRESS,
+            "set_public_mint_time",
+            [], [
+                BCS.bcsSerializeStr(collectionName),
+                BCS.bcsSerializeUint64(time),
+            ]
+        )
+    )
+    const [{sequence_number: sequenceNumber}, chainId] = await Promise.all([
+        client.getAccount(account.address()),
+        client.getChainId()
+    ])
+    const expireAt = BigInt(Math.floor(Date.now() / 1000) + 10)
+    const tx = new TxnBuilderTypes.RawTransaction(
+        TxnBuilderTypes.AccountAddress.fromHex(account.address()),
+        BigInt(sequenceNumber),
+        payload,
+        1000000n,
+        100n,
+        expireAt,
+        new TxnBuilderTypes.ChainId(chainId),
+    )
+
+    const bcsTx = AptosClient.generateBCSTransaction(account, tx);
+    const pendingTx = await client.submitSignedBCSTransaction(bcsTx);
+    logger.info(`updateMintTime submit tx(${pendingTx.hash})`)
     return pendingTx.hash
 }
 
@@ -281,7 +387,7 @@ export async function updateWhitelist(
         TxnBuilderTypes.AccountAddress.fromHex(account.address()),
         BigInt(sequenceNumber),
         payload,
-        100000n,
+        1000000n,
         100n,
         expireAt,
         new TxnBuilderTypes.ChainId(chainId),
@@ -292,3 +398,65 @@ export async function updateWhitelist(
     logger.info(`updateWhitelist submit tx(${pendingTx.hash})`)
     return pendingTx.hash
 }
+
+export interface CmConfig{
+    admin:string
+    isPublic:boolean
+    maxSupplyPerUser:bigint
+    mintFee:bigint
+    mintsPerUserHandle:string
+    presaleMintTime:number
+    publicMintTime:number
+    supplyPerWLHandle:string
+}
+
+export async function getCmConfig(
+    client:AptosClient,resourceAccount:string,collectionName:string
+):Promise<CmConfig>{
+    const resourceType=`${CANDY_MACHINE_MODULE_ADDRESS}::CollectionConfigs`
+    const resource=await client.getAccountResource(resourceAccount,resourceType)
+    console.log(resource)
+    const handle=(resource as any)["data"]["collection_configs"]["handle"]
+    const res= await client.getTableItem(
+        handle,{
+            key_type: "0x1::string::String",
+            value_type: `${CANDY_MACHINE_MODULE_ADDRESS}::CollectionConfig`,
+            key: collectionName,
+        })
+    const config={
+        admin:res['admin'],
+        isPublic:res['is_public'],
+        maxSupplyPerUser:BigInt(res['max_supply_per_user']),
+        mintFee:BigInt(res['mint_fee_per_mille']),
+        mintsPerUserHandle:res['mints_per_user']['handle'],
+        presaleMintTime:Number(res['presale_mint_time']),
+        publicMintTime:Number(res['public_mint_time']),
+        supplyPerWLHandle:res['supply_per_wl']['handle'],
+    }
+    return config
+}
+
+export async function getSupplyInWhitelist(
+    client:AptosClient,handle:string,user:string
+):Promise<bigint>{
+    const res= await client.getTableItem(
+        handle,{
+            key_type: "address",
+            value_type: "u64",
+            key: user,
+        })
+    return res as bigint
+}
+
+export async function getMintedAmount(
+    client:AptosClient,handle:string,user:string
+):Promise<bigint>{
+    const res= await client.getTableItem(
+        handle,{
+            key_type: "address",
+            value_type: "u64",
+            key: user,
+        })
+    return res as bigint
+}
+

@@ -1,25 +1,31 @@
 import type {Arguments, CommandBuilder} from 'yargs';
-import {createCandyMachine, createCollection, mintTokens, uploadNFT} from "../../candyMachine";
-import {loadCreatorAccount, loadMinterAccount, retryFn, shuffle, transformAttribute} from "../../helpers";
+import {createCandyMachine, createCollection, uploadNFT} from "../../candyMachine";
+import {loadCreatorAccount, retryFn, shuffle, transformAttribute} from "../../helpers";
 import {AptosClient, TxnBuilderTypes} from "aptos";
 import {NODE_URL} from "../../config";
 import fs from "fs";
-import {string} from "yargs";
 import {logger} from "../../logger";
-import {subtle} from "crypto";
+import {string} from "yargs";
 
 type Options = {
+    infoPath:string
     metadataDir:string
     royaltyInfo:string
     collectionName:string
 };
 
-export const command: string = 'uploadNFT';
-export const desc: string = 'upload NFT';
+export const command: string = 'setupCm';
+export const desc: string = 'setup candy machine';
 
 export const builder: CommandBuilder<Options, Options> = (yargs) =>
     yargs
-        .option('metadataDir', {
+        .option('infoPath', {
+            alias: "ip",
+            type: 'string',
+            demandOption: true,
+            describe: 'collection info file path',
+            default:"/Users/daiwanwei/Projects/aptos_ex/aptos-nft-cm-example/collectionInfo-aaa.json"
+        }).option('metadataDir', {
             alias: "m",
             type: 'string',
             demandOption: true,
@@ -31,14 +37,19 @@ export const builder: CommandBuilder<Options, Options> = (yargs) =>
             demandOption: true,
             describe: 'royaltyInfo',
             default:"/Users/daiwanwei/Projects/aptos_ex/aptos-nft-cm-example/royaltyInfo.json"
-        }).option('collectionName', {
-            alias: "collectionName",
-            type: 'string',
-            demandOption: true,
-            describe: 'collection name',
-            default:"Daiwanwei-3"
         })
 
+
+interface CollectionInfo{
+    collectionName:string
+    description:string,
+    uri:string,
+    maxSupply:bigint,
+    mintFee:bigint,
+    maxSupplyPerUser:bigint,
+    presaleMintTime:number,
+    publicMintTime:number,
+}
 
 interface TokenInfo{
     name:string
@@ -60,17 +71,49 @@ interface RoyaltyInfo{
 
 export async function handler(argv: Arguments<Options>): Promise<void> {
     const {
-        metadataDir,collectionName,royaltyInfo
+        infoPath,metadataDir,royaltyInfo
     }=argv
     logger.info(`metadata in (${metadataDir})`)
-    logger.info(`collectionName info in (${collectionName})`)
+    logger.info(`collection info in (${infoPath})`)
     logger.info(`royalty info in (${royaltyInfo})`)
     const {
         creator,royaltyDenominator,royaltyNumerator
     }= JSON.parse(fs.readFileSync(royaltyInfo).toString()) as RoyaltyInfo
-
+    const info= JSON.parse(fs.readFileSync(infoPath).toString()) as CollectionInfo
+    const {
+        collectionName, description, uri,maxSupplyPerUser,
+        maxSupply, mintFee, presaleMintTime, publicMintTime
+    }= info
+    const account=loadCreatorAccount()
     const aptosClient=new AptosClient(NODE_URL)
-    const creatorAccount=loadCreatorAccount()
+    try {
+        const req={
+            name:collectionName,
+            description:description,
+            uri:uri,
+            maxSupply:BigInt(maxSupply),
+            mintFee: BigInt(mintFee),
+            maxSupplyPerUser:BigInt(maxSupplyPerUser),
+            presaleMintTime:presaleMintTime,
+            publicMintTime:publicMintTime,
+        }
+        const res=await createCollection(aptosClient,account,req)
+        const receipt = (await aptosClient.waitForTransactionWithResult(res))
+        //@ts-ignore
+        const isSuccess=receipt.success
+        if (isSuccess){
+            logger.info(`createCollection txn success,(${res})`)
+            //@ts-ignore
+            logger.info(`createCollection gas used, gas(${receipt.gas_used}),price(${receipt.gas_unit_price})`)
+        }else {
+            //@ts-ignore
+            logger.error(`createCollection txn fail,(${receipt.vm_status})`)
+            return
+        }
+    }catch (e){
+        logger.error(`createCm txn fail,(${e})`)
+        return
+    }
     const filenameList= fs.readdirSync(metadataDir)
     shuffle(filenameList)
     const amount=filenameList.length
@@ -86,8 +129,7 @@ export async function handler(argv: Arguments<Options>): Promise<void> {
         let propertyValues:number[][][]=[]
         let propertyTypes:string[][]=[]
         for (let j=(i*batch);j<((i+1)*batch);j++){
-            console.log(`upload nft:Step(${i}),Number(${j}),filename(${filenameList[j]})`)
-            if (filenameList[j].split('.').pop()!=="json") continue;
+            console.log(`upload nft:Step(${i}),Number(${j})`)
             const filepath=`${metadataDir}/${filenameList[j]}`
             const info= JSON.parse(fs.readFileSync(filepath).toString()) as TokenInfo
             const {
@@ -115,7 +157,7 @@ export async function handler(argv: Arguments<Options>): Promise<void> {
         }
         const fn=async ()=>{
             try {
-                const res=await uploadNFT(aptosClient,creatorAccount,uploadNFTReq)
+                const res=await uploadNFT(aptosClient,account,uploadNFTReq)
                 const receipt = (await aptosClient.waitForTransactionWithResult(res))
                 //@ts-ignore
                 const isSuccess=receipt.success
@@ -136,7 +178,7 @@ export async function handler(argv: Arguments<Options>): Promise<void> {
                 return false
             }
         }
-        await retryFn(1,fn)
+        await retryFn(5,fn)
 
     }
     let tokenNames:string[]=[]
@@ -146,8 +188,7 @@ export async function handler(argv: Arguments<Options>): Promise<void> {
     let propertyValues:number[][][]=[]
     let propertyTypes:string[][]=[]
     for (let k=(step*batch);k<amount;k++){
-        console.log(`upload nft:Reminder,Number(${k}),Filename(${filenameList[k]})`)
-        if (filenameList[k].split('.').pop()!=="json") continue;
+        console.log(`upload nft:Reminder,Number(${k})`)
         const filepath=`${metadataDir}/${filenameList[k]}`
         const info= JSON.parse(fs.readFileSync(filepath).toString()) as TokenInfo
         const {
@@ -177,7 +218,7 @@ export async function handler(argv: Arguments<Options>): Promise<void> {
 
         const fn=async ()=>{
             try {
-                const res=await uploadNFT(aptosClient,creatorAccount,uploadNFTReq)
+                const res=await uploadNFT(aptosClient,account,uploadNFTReq)
                 const receipt = (await aptosClient.waitForTransactionWithResult(res))
                 //@ts-ignore
                 const isSuccess=receipt.success
@@ -198,7 +239,7 @@ export async function handler(argv: Arguments<Options>): Promise<void> {
                 return false
             }
         }
-        await retryFn(1,fn)
+        await retryFn(5,fn)
     }
     process.exit(0);
 };

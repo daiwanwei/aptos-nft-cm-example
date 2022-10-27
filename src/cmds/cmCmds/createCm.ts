@@ -24,6 +24,8 @@ export async function handler(argv: Arguments<Options>): Promise<void> {
         const isSuccess=receipt.success
         if (isSuccess){
             logger.info(`createCm txn success,(${res})`)
+            //@ts-ignore
+            logger.info(`createCm gas used, gas(${receipt.gas_used}),price(${receipt.gas_unit_price})`)
         }else {
             //@ts-ignore
             logger.error(`createCm txn fail,(${receipt.vm_status})`)

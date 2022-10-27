@@ -50,13 +50,15 @@ export async function handler(argv: Arguments<Options>): Promise<void> {
         //@ts-ignore
         const isSuccess=receipt.success
         if (isSuccess){
-            logger.info(`createCm txn success,(${res})`)
+            logger.info(`mintTokens txn success,(${res})`)
+            //@ts-ignore
+            logger.info(`mintTokens gas used, gas(${receipt.gas_used}),price(${receipt.gas_unit_price})`)
         }else {
             //@ts-ignore
-            logger.error(`createCm txn fail,(${receipt.vm_status})`)
+            logger.error(`mintTokens txn fail,(${receipt.vm_status})`)
         }
     }catch (e){
-        logger.error(`createCm txn fail,(${e})`)
+        logger.error(`mintTokens txn fail,(${e})`)
     }
     process.exit(0);
 };

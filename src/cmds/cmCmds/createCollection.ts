@@ -20,7 +20,7 @@ export const builder: CommandBuilder<Options, Options> = (yargs) =>
             type: 'string',
             demandOption: true,
             describe: 'collection info file path',
-            default:"/Users/daiwanwei/Projects/aptos_ex/aptos-nft-cm-example/collectionInfo.json"
+            default:"/Users/daiwanwei/Projects/aptos_ex/aptos-nft-cm-example/collectionInfo-aaa.json"
         })
 
 
@@ -62,13 +62,15 @@ export async function handler(argv: Arguments<Options>): Promise<void> {
         //@ts-ignore
         const isSuccess=receipt.success
         if (isSuccess){
-            logger.info(`createCm txn success,(${res})`)
+            logger.info(`createCollection txn success,(${res})`)
+            //@ts-ignore
+            logger.info(`createCollection gas used, gas(${receipt.gas_used}),price(${receipt.gas_unit_price})`)
         }else {
             //@ts-ignore
-            logger.error(`createCm txn fail,(${receipt.vm_status})`)
+            logger.error(`createCollection txn fail,(${receipt.vm_status})`)
         }
     }catch (e){
-        logger.error(`createCm txn fail,(${e})`)
+        logger.error(`createCollection txn fail,(${e})`)
     }
     process.exit(0);
 };
